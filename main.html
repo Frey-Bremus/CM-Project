@@ -3,16 +3,93 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>CM-Project</title>
+  <title>Move the Circle</title>
   <style>
     html,
     body {
       width: 100%;
       height: 100%;
       margin: 0;
+      overflow: hidden;
       background: #808080;
+    }
+
+    #circle {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      width: 140px;
+      height: 140px;
+      z-index: 1;
+      transform: translate(-50%, -50%);
+      transition: width 150ms ease, height 150ms ease;
+    }
+
+    #circle svg {
+      display: block;
+      width: 100%;
+      height: 100%;
     }
   </style>
 </head>
-<body></body>
+<body>
+  <div id="circle" role="img" aria-label="Red tentacled creature controlled by the arrow keys">
+    <svg viewBox="0 0 140 140" aria-hidden="true">
+      <g fill="none" stroke="#d71920" stroke-linecap="round" stroke-width="9">
+        <path d="M48 72 C39 80 37 91 27 96 C20 100 19 105 23 109" />
+        <path d="M56 77 C51 90 55 98 48 108 C43 115 45 120 51 122" />
+        <path d="M66 79 C64 92 70 101 66 111 C63 119 67 124 73 124" />
+        <path d="M76 78 C82 89 78 99 86 108 C92 115 90 121 84 124" />
+        <path d="M85 73 C96 79 96 89 106 94 C114 98 115 104 111 109" />
+        <path d="M43 61 C31 62 25 68 18 65 C12 63 10 58 13 54" />
+        <path d="M95 61 C107 62 113 68 120 65 C126 63 128 58 125 54" />
+      </g>
+      <path d="M70 31 C54 31 43 43 43 59 C43 72 54 81 70 81 C86 81 97 72 97 59 C97 43 86 31 70 31Z" fill="#ed2028" />
+      <ellipse cx="61" cy="57" rx="4" ry="6" fill="#fff" />
+      <ellipse cx="79" cy="57" rx="4" ry="6" fill="#fff" />
+      <circle cx="62" cy="59" r="2" fill="#292929" />
+      <circle cx="78" cy="59" r="2" fill="#292929" />
+    </svg>
+  </div>
+  <script>
+    const circle = document.getElementById("circle");
+    const speed = 240;
+    const pressedKeys = new Set();
+    let x = 0;
+    let y = 0;
+    let previousFrameTime;
+
+    function moveCircle(time) {
+      const elapsed = previousFrameTime === undefined ? 0 : (time - previousFrameTime) / 1000;
+      previousFrameTime = time;
+      const maxX = Math.max(0, window.innerWidth / 2 - circle.offsetWidth / 2);
+      const maxY = Math.max(0, window.innerHeight / 2 - circle.offsetHeight / 2);
+
+      if (pressedKeys.has("ArrowUp")) y -= speed * elapsed;
+      if (pressedKeys.has("ArrowDown")) y += speed * elapsed;
+      if (pressedKeys.has("ArrowLeft")) x -= speed * elapsed;
+      if (pressedKeys.has("ArrowRight")) x += speed * elapsed;
+
+      x = Math.max(-maxX, Math.min(maxX, x));
+      y = Math.max(-maxY, Math.min(maxY, y));
+      circle.style.left = `calc(50% + ${x}px)`;
+      circle.style.top = `calc(50% + ${y}px)`;
+      requestAnimationFrame(moveCircle);
+    }
+
+    document.addEventListener("keydown", (event) => {
+      if (!event.key.startsWith("Arrow")) return;
+      event.preventDefault();
+      pressedKeys.add(event.key);
+    });
+
+    document.addEventListener("keyup", (event) => {
+      pressedKeys.delete(event.key);
+    });
+
+    window.addEventListener("blur", () => pressedKeys.clear());
+    requestAnimationFrame(moveCircle);
+  </script>
+  <script src="entities.js"></script>
+</body>
 </html>
