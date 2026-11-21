@@ -3,7 +3,6 @@
   const canvas = document.getElementById("background");
   const ctx = canvas.getContext("2d");
 
-  // Original artwork dimensions
   const MENU_WIDTH = 1424;
   const MENU_HEIGHT = 710;
 
@@ -38,15 +37,16 @@
 
   let screen = "title";
   let frame = 0;
+
   let nextGlitch = performance.now() + 3000;
   let glitchEnd = 0;
   let lastFrameChange = 0;
 
-  // Change between screens
   function setScreen(next) {
     screen = next;
     frame = 0;
     glitchEnd = 0;
+
     nextGlitch = performance.now() + 3000;
 
     if (next === "game") {
@@ -62,23 +62,18 @@
     }
   }
 
-  // Begin with title screen
   setScreen("title");
 
-  // Draw menu animations
-  function draw(now) {
-    if (screen === "game") {
-      requestAnimationFrame(draw);
-      return;
-    }
+function draw(now) {
+  if (screen === "game") {
+    return;
+  }
 
-    // Start glitch
     if (now >= nextGlitch && glitchEnd === 0) {
       glitchEnd = now + 350;
       lastFrameChange = 0;
     }
 
-    // Switch glitch frames
     if (glitchEnd !== 0) {
       if (now >= glitchEnd) {
         frame = 0;
@@ -96,7 +91,13 @@
 
     if (img.complete && img.naturalWidth > 0) {
       ctx.imageSmoothingEnabled = false;
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      ctx.clearRect(
+        0,
+        0,
+        canvas.width,
+        canvas.height
+      );
 
       ctx.drawImage(
         img,
@@ -110,7 +111,6 @@
     requestAnimationFrame(draw);
   }
 
-  // Handle button clicks
   canvas.addEventListener("click", event => {
     if (screen === "game") return;
 
@@ -123,8 +123,7 @@
       * canvas.height / rect.height;
 
     if (screen === "title") {
-
-      // START button
+      // START
       if (
         x >= 500 && x <= 950 &&
         y >= 340 && y <= 500
@@ -133,7 +132,7 @@
         return;
       }
 
-      // CONTROLS button
+      // CONTROLS
       if (
         x >= 450 && x <= 1000 &&
         y >= 500 && y <= 680
@@ -141,10 +140,10 @@
         setScreen("controls");
         return;
       }
+    }
 
-    } else if (screen === "controls") {
-
-      // BACK button
+    if (screen === "controls") {
+      // BACK
       if (
         x >= 500 && x <= 950 &&
         y >= 490 && y <= 700
