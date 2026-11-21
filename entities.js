@@ -8,9 +8,18 @@
   const backgroundFrameDuration = 60;
 
   const playerFrameSize = 64;
+  const playerColumns = 8;
   const playerBottomOffset = -13;
   const idleFrameCount = 7;
   const idleFrameDuration = 125;
+
+  // Left animation: frames 8-11
+  const leftStartFrame = 7;
+  const leftFrameCount = 4;
+
+  // Release animation: frames 12-15
+  const releaseStartFrame = 11;
+  const releaseFrameCount = 4;
 
   const canvas = document.getElementById("background");
   const context = canvas.getContext("2d");
@@ -21,6 +30,9 @@
 
   let backgroundFrame = 0;
   let idleFrame = 0;
+  let movementFrame = 0;
+  let releaseFrame = 0;
+
   let lastBackgroundFrameTime = null;
   let lastIdleFrameTime = null;
   let lastMovementTime = null;
@@ -30,14 +42,25 @@
   let backgroundSheetLoaded = false;
   let gameStarted = false;
 
+  let releasingLeft = false;
+  let wasMovingLeft = false;
+
   // PLAYER MOVEMENT
   let playerX = (backgroundFrameWidth - playerFrameSize) / 2;
   const playerY =
     backgroundFrameHeight - playerFrameSize - playerBottomOffset;
 
   const playerSpeed = 65;
-  let facing = "right";
 
+  const isMovingLeft = () =>
+    keysPressed.has("ArrowLeft") ||
+    keysPressed.has("KeyA");
+
+  const isMovingRight = () =>
+    keysPressed.has("ArrowRight") ||
+    keysPressed.has("KeyD");
+
+  // DRAW BACKGROUND AND PLAYER
   const drawScene = () => {
     if (!gameStarted || !backgroundSheetLoaded) return;
 
@@ -49,7 +72,10 @@
       Math.floor(backgroundFrame / backgroundColumns);
 
     context.clearRect(
-      0, 0, backgroundFrameWidth, backgroundFrameHeight
+      0,
+      0,
+      backgroundFrameWidth,
+      backgroundFrameHeight
     );
 
     context.drawImage(
@@ -58,48 +84,40 @@
       backgroundRow * backgroundFrameHeight,
       backgroundFrameWidth,
       backgroundFrameHeight,
-      0, 0,
+      0,
+      0,
       backgroundFrameWidth,
       backgroundFrameHeight
     );
 
     if (backgroundFinished && playerSheetLoaded) {
-      context.save();
+      let currentFrame = idleFrame;
 
-      // Flip sprite when facing left
-      if (facing === "left") {
-        context.translate(playerX + playerFrameSize, 0);
-        context.scale(-1, 1);
-
-        context.drawImage(
-          playerSheet,
-          idleFrame * playerFrameSize,
-          0,
-          playerFrameSize,
-          playerFrameSize,
-          0,
-          playerY,
-          playerFrameSize,
-          playerFrameSize
-        );
-      } else {
-        context.drawImage(
-          playerSheet,
-          idleFrame * playerFrameSize,
-          0,
-          playerFrameSize,
-          playerFrameSize,
-          playerX,
-          playerY,
-          playerFrameSize,
-          playerFrameSize
-        );
+      if (isMovingLeft() && !isMovingRight()) {
+        currentFrame = leftStartFrame + movementFrame;
+      } else if (releasingLeft) {
+        currentFrame = releaseStartFrame + releaseFrame;
       }
 
-      context.restore();
+      // Calculate sprite sheet row and column
+      const playerColumn = currentFrame % playerColumns;
+      const playerRow = Math.floor(currentFrame / playerColumns);
+
+      context.drawImage(
+        playerSheet,
+        playerColumn * playerFrameSize,
+        playerRow * playerFrameSize,
+        playerFrameSize,
+        playerFrameSize,
+        playerX,
+        playerY,
+        playerFrameSize,
+        playerFrameSize
+      );
     }
   };
 
+  // GAMEPLAY ANIMATION
   const animate = timestamp => {
     if (!gameStarted) return;
 
@@ -127,7 +145,7 @@
       }
     }
 
-    // MOVEMENT
+    // PLAYER MOVEMENT
     if (lastMovementTime === null) {
       lastMovementTime = timestamp;
     }
@@ -136,28 +154,38 @@
       (timestamp - lastMovementTime) / 1000,
       0.05
     );
+
     lastMovementTime = timestamp;
 
     if (backgroundFinished) {
-      const movingLeft =
-        keysPressed.has("ArrowLeft") ||
-        keysPressed.has("KeyA");
+      const movingLeft = isMovingLeft();
+      const movingRight = isMovingRight();
 
-      const movingRight =
-        keysPressed.has("ArrowRight") ||
-        keysPressed.has("KeyD");
+      // Detect when left key is released
+      if (wasMovingLeft && !movingLeft) {
+        releasingLeft = true;
+        releaseFrame = 0;
+        lastIdleFrameTime = timestamp;
+      }
+
+      // Detect when left key is pressed
+      if (movingLeft && !wasMovingLeft) {
+        releasingLeft = false;
+        movementFrame = 0;
+        lastIdleFrameTime = timestamp;
+      }
+
+      wasMovingLeft = movingLeft;
 
       if (movingLeft && !movingRight) {
         playerX -= playerSpeed * deltaTime;
-        facing = "left";
       }
 
       if (movingRight && !movingLeft) {
         playerX += playerSpeed * deltaTime;
-        facing = "right";
       }
 
-      // Keep player inside the screen
+      // Keep player inside screen
       playerX = Math.max(
         0,
         Math.min(
@@ -166,26 +194,40 @@
         )
       );
 
-      // IDLE ANIMATION
-      if (!movingLeft && !movingRight) {
-        if (lastIdleFrameTime === null) {
-          lastIdleFrameTime = timestamp;
-        } else if (
-          timestamp - lastIdleFrameTime >= idleFrameDuration
-        ) {
-          const elapsedFrames = Math.floor(
-            (timestamp - lastIdleFrameTime) /
-            idleFrameDuration
-          );
+      // PLAYER ANIMATION
+      if (lastIdleFrameTime === null) {
+        lastIdleFrameTime = timestamp;
+      } else if (
+        timestamp - lastIdleFrameTime >= idleFrameDuration
+      ) {
+        const elapsedFrames = Math.floor(
+          (timestamp - lastIdleFrameTime) /
+          idleFrameDuration
+        );
 
+        if (movingLeft && !movingRight) {
+          // Play frames 8-13 once, hold on 13
+          movementFrame = Math.min(
+            movementFrame + elapsedFrames,
+            leftFrameCount - 1
+          );
+        } else if (releasingLeft) {
+          // Play frames 12-15 once
+          releaseFrame += elapsedFrames;
+
+          if (releaseFrame >= releaseFrameCount) {
+            releasingLeft = false;
+            releaseFrame = 0;
+            idleFrame = 0;
+          }
+        } else {
+          // Normal idle animation
           idleFrame =
             (idleFrame + elapsedFrames) % idleFrameCount;
-
-          lastIdleFrameTime +=
-            elapsedFrames * idleFrameDuration;
         }
-      } else {
-        lastIdleFrameTime = timestamp;
+
+        lastIdleFrameTime +=
+          elapsedFrames * idleFrameDuration;
       }
     }
 
@@ -200,6 +242,11 @@
     gameStarted = true;
     backgroundFrame = 0;
     idleFrame = 0;
+    movementFrame = 0;
+    releaseFrame = 0;
+
+    releasingLeft = false;
+    wasMovingLeft = false;
 
     playerX =
       (backgroundFrameWidth - playerFrameSize) / 2;
@@ -244,7 +291,10 @@
 
   backgroundSheet.addEventListener("load", () => {
     backgroundSheetLoaded = true;
-    if (gameStarted) drawScene();
+
+    if (gameStarted) {
+      drawScene();
+    }
   });
 
   backgroundSheet.addEventListener("error", () => {
