@@ -1,3 +1,4 @@
+
 (() => {
   const backgroundFrameWidth = 256;
   const backgroundFrameHeight = 128;
@@ -9,23 +10,35 @@
   const playerBottomOffset = -13;
   const idleFrameCount = 7;
   const idleFrameDuration = 125;
+
   const canvas = document.getElementById("background");
   const context = canvas.getContext("2d");
+
   const backgroundSheet = new Image();
   const playerSheet = new Image();
   const keysPressed = new Set();
+
   let backgroundFrame = 0;
   let idleFrame = 0;
   let lastBackgroundFrameTime = null;
   let lastIdleFrameTime = null;
   let backgroundFinished = false;
   let playerSheetLoaded = false;
+  let backgroundSheetLoaded = false;
+
+  // NEW: Gameplay starts only after START is clicked
+  let gameStarted = false;
 
   const drawScene = () => {
+    if (!gameStarted || !backgroundSheetLoaded) return;
+
     const backgroundColumn = backgroundFrame % backgroundColumns;
     const backgroundRow = Math.floor(backgroundFrame / backgroundColumns);
 
-    context.clearRect(0, 0, backgroundFrameWidth, backgroundFrameHeight);
+    context.clearRect(
+      0, 0, backgroundFrameWidth, backgroundFrameHeight
+    );
+
     context.drawImage(
       backgroundSheet,
       backgroundColumn * backgroundFrameWidth,
@@ -54,34 +67,47 @@
   };
 
   const animate = (timestamp) => {
+    if (!gameStarted) return;
+
     if (lastBackgroundFrameTime === null) {
       lastBackgroundFrameTime = timestamp;
     } else if (
-      !backgroundFinished
-      && timestamp - lastBackgroundFrameTime >= backgroundFrameDuration
+      !backgroundFinished &&
+      timestamp - lastBackgroundFrameTime >= backgroundFrameDuration
     ) {
       const elapsedFrames = Math.floor(
-        (timestamp - lastBackgroundFrameTime) / backgroundFrameDuration
+        (timestamp - lastBackgroundFrameTime) /
+        backgroundFrameDuration
       );
+
       const nextFrame = backgroundFrame + elapsedFrames;
+
       if (nextFrame >= backgroundFrameCount) {
         backgroundFrame = backgroundHoldFrame;
         backgroundFinished = true;
       } else {
         backgroundFrame = nextFrame;
-        lastBackgroundFrameTime += elapsedFrames * backgroundFrameDuration;
+        lastBackgroundFrameTime +=
+          elapsedFrames * backgroundFrameDuration;
       }
     }
 
     if (backgroundFinished && keysPressed.size === 0) {
       if (lastIdleFrameTime === null) {
         lastIdleFrameTime = timestamp;
-      } else if (timestamp - lastIdleFrameTime >= idleFrameDuration) {
+      } else if (
+        timestamp - lastIdleFrameTime >= idleFrameDuration
+      ) {
         const elapsedFrames = Math.floor(
-          (timestamp - lastIdleFrameTime) / idleFrameDuration
+          (timestamp - lastIdleFrameTime) /
+          idleFrameDuration
         );
-        idleFrame = (idleFrame + elapsedFrames) % idleFrameCount;
-        lastIdleFrameTime += elapsedFrames * idleFrameDuration;
+
+        idleFrame =
+          (idleFrame + elapsedFrames) % idleFrameCount;
+
+        lastIdleFrameTime +=
+          elapsedFrames * idleFrameDuration;
       }
     } else if (backgroundFinished) {
       lastIdleFrameTime = timestamp;
@@ -91,12 +117,30 @@
     requestAnimationFrame(animate);
   };
 
-  window.addEventListener("keydown", (event) => {
-    keysPressed.add(event.code);
+  // NEW: Listen for START button
+  canvas.addEventListener("hive:start", () => {
+    if (gameStarted) return;
+
+    gameStarted = true;
+    backgroundFrame = 0;
+    idleFrame = 0;
+    backgroundFinished = false;
+    lastBackgroundFrameTime = null;
+    lastIdleFrameTime = null;
+
+    requestAnimationFrame(animate);
   });
+
+  window.addEventListener("keydown", (event) => {
+    if (gameStarted) {
+      keysPressed.add(event.code);
+    }
+  });
+
   window.addEventListener("keyup", (event) => {
     keysPressed.delete(event.code);
   });
+
   window.addEventListener("blur", () => {
     keysPressed.clear();
   });
@@ -104,15 +148,25 @@
   playerSheet.addEventListener("load", () => {
     playerSheetLoaded = true;
   });
+
   playerSheet.addEventListener("error", () => {
-    console.error("Could not load images/Player Sprite.png");
+    console.error(
+      "Could not load images/Player Sprite.png"
+    );
   });
+
   backgroundSheet.addEventListener("load", () => {
-    drawScene();
-    requestAnimationFrame(animate);
+    backgroundSheetLoaded = true;
+
+    if (gameStarted) {
+      drawScene();
+    }
   });
+
   backgroundSheet.addEventListener("error", () => {
-    console.error("Could not load images/Background.png");
+    console.error(
+      "Could not load images/Background.png"
+    );
   });
 
   playerSheet.src = "images/Player Sprite.png";

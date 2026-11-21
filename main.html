@@ -1,12 +1,13 @@
+
 <!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Background Sprite</title>
+  <title>HIVE</title>
+
   <style>
-    html,
-    body {
+    html, body {
       width: 100%;
       height: 100%;
       margin: 0;
@@ -22,11 +23,20 @@
       width: min(768px, 90vw);
       height: auto;
       image-rendering: pixelated;
+      cursor: pointer;
     }
   </style>
+
   <script src="entities.js" defer></script>
+  <script src="screens.js" defer></script>
 </head>
+
 <body>
-  <canvas id="background" width="256" height="128" aria-label="Animated background with an idle player sprite"></canvas>
+  <canvas
+    id="background"
+    width="256"
+    height="128"
+    aria-label="HIVE game">
+  </canvas>
 </body>
 </html>
