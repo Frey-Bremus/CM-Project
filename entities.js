@@ -6,6 +6,7 @@
   const backgroundFrameCount = backgroundColumns * 11;
   const backgroundHoldFrame = 26;
   const backgroundFrameDuration = 60;
+
   const playerFrameSize = 64;
   const playerBottomOffset = -13;
   const idleFrameCount = 7;
@@ -16,27 +17,40 @@
 
   const backgroundSheet = new Image();
   const playerSheet = new Image();
+
   const keysPressed = new Set();
 
   let backgroundFrame = 0;
   let idleFrame = 0;
+
   let lastBackgroundFrameTime = null;
   let lastIdleFrameTime = null;
+
   let backgroundFinished = false;
   let playerSheetLoaded = false;
   let backgroundSheetLoaded = false;
 
-  // NEW: Gameplay starts only after START is clicked
   let gameStarted = false;
 
+  // Draw background and player
   const drawScene = () => {
-    if (!gameStarted || !backgroundSheetLoaded) return;
+    if (!gameStarted || !backgroundSheetLoaded) {
+      return;
+    }
 
-    const backgroundColumn = backgroundFrame % backgroundColumns;
-    const backgroundRow = Math.floor(backgroundFrame / backgroundColumns);
+    context.imageSmoothingEnabled = false;
+
+    const backgroundColumn =
+      backgroundFrame % backgroundColumns;
+
+    const backgroundRow =
+      Math.floor(backgroundFrame / backgroundColumns);
 
     context.clearRect(
-      0, 0, backgroundFrameWidth, backgroundFrameHeight
+      0,
+      0,
+      backgroundFrameWidth,
+      backgroundFrameHeight
     );
 
     context.drawImage(
@@ -51,6 +65,7 @@
       backgroundFrameHeight
     );
 
+    // Player appears after background animation
     if (backgroundFinished && playerSheetLoaded) {
       context.drawImage(
         playerSheet,
@@ -59,44 +74,52 @@
         playerFrameSize,
         playerFrameSize,
         (backgroundFrameWidth - playerFrameSize) / 2,
-        backgroundFrameHeight - playerFrameSize - playerBottomOffset,
+        backgroundFrameHeight -
+          playerFrameSize -
+          playerBottomOffset,
         playerFrameSize,
         playerFrameSize
       );
     }
   };
 
-  const animate = (timestamp) => {
+  // Gameplay animation
+  const animate = timestamp => {
     if (!gameStarted) return;
 
     if (lastBackgroundFrameTime === null) {
       lastBackgroundFrameTime = timestamp;
     } else if (
       !backgroundFinished &&
-      timestamp - lastBackgroundFrameTime >= backgroundFrameDuration
+      timestamp - lastBackgroundFrameTime >=
+        backgroundFrameDuration
     ) {
       const elapsedFrames = Math.floor(
         (timestamp - lastBackgroundFrameTime) /
         backgroundFrameDuration
       );
 
-      const nextFrame = backgroundFrame + elapsedFrames;
+      const nextFrame =
+        backgroundFrame + elapsedFrames;
 
       if (nextFrame >= backgroundFrameCount) {
         backgroundFrame = backgroundHoldFrame;
         backgroundFinished = true;
       } else {
         backgroundFrame = nextFrame;
+
         lastBackgroundFrameTime +=
           elapsedFrames * backgroundFrameDuration;
       }
     }
 
+    // Idle player animation
     if (backgroundFinished && keysPressed.size === 0) {
       if (lastIdleFrameTime === null) {
         lastIdleFrameTime = timestamp;
       } else if (
-        timestamp - lastIdleFrameTime >= idleFrameDuration
+        timestamp - lastIdleFrameTime >=
+        idleFrameDuration
       ) {
         const elapsedFrames = Math.floor(
           (timestamp - lastIdleFrameTime) /
@@ -104,7 +127,8 @@
         );
 
         idleFrame =
-          (idleFrame + elapsedFrames) % idleFrameCount;
+          (idleFrame + elapsedFrames) %
+          idleFrameCount;
 
         lastIdleFrameTime +=
           elapsedFrames * idleFrameDuration;
@@ -117,27 +141,30 @@
     requestAnimationFrame(animate);
   };
 
-  // NEW: Listen for START button
+  // Start gameplay when START is clicked
   canvas.addEventListener("hive:start", () => {
     if (gameStarted) return;
 
     gameStarted = true;
+
     backgroundFrame = 0;
     idleFrame = 0;
+
     backgroundFinished = false;
+
     lastBackgroundFrameTime = null;
     lastIdleFrameTime = null;
 
     requestAnimationFrame(animate);
   });
 
-  window.addEventListener("keydown", (event) => {
+  window.addEventListener("keydown", event => {
     if (gameStarted) {
       keysPressed.add(event.code);
     }
   });
 
-  window.addEventListener("keyup", (event) => {
+  window.addEventListener("keyup", event => {
     keysPressed.delete(event.code);
   });
 
