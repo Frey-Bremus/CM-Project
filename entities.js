@@ -1,214 +1,490 @@
 
 (() => {
-  const backgroundFrameWidth = 256;
-  const backgroundFrameHeight = 128;
-  const backgroundColumns = 8;
-  const backgroundFrameCount = backgroundColumns * 11;
-  const backgroundHoldFrame = 26;
-  const backgroundFrameDuration = 60;
-
-  const playerFrameSize = 64;
-  const playerBottomOffset = -13;
-  const idleFrameCount = 7;
-  const idleFrameDuration = 125;
-
   const canvas = document.getElementById("background");
-  const context = canvas.getContext("2d");
+  const ctx = canvas.getContext("2d");
 
-  const backgroundSheet = new Image();
-  const playerSheet = new Image();
-  const keysPressed = new Set();
+  const WIDTH = 256;
+  const HEIGHT = 128;
 
-  let backgroundFrame = 0;
-  let idleFrame = 0;
-  let lastBackgroundFrameTime = null;
-  let lastIdleFrameTime = null;
-  let lastMovementTime = null;
+  const BG_COLUMNS = 8;
+  const BG_FRAMES = 88;
+  const BG_HOLD = 26;
+  const BG_DURATION = 60;
 
-  let backgroundFinished = false;
-  let playerSheetLoaded = false;
-  let backgroundSheetLoaded = false;
+  const SPRITE_SIZE = 64;
+  const IDLE_FRAMES = 7;
+  const IDLE_DURATION = 125;
+
+  const SPEED = 65;
+  const GROWTH = 0.15;
+  const ABSORB_DURATION = 400;
+
+  const keys = new Set();
+
+  function loadImage(path) {
+    const image = new Image();
+    image.src = path;
+
+    image.onerror = () => {
+      console.error("Could not load:", path);
+    };
+
+    return image;
+  }
+
+  const background = loadImage("images/Background.png");
+  const playerSheet = loadImage("images/Player Sprite.png");
+
+  const rooms = {
+    left: {
+      image: loadImage("images/Left Room/Left_1.png"),
+      emptyImage: loadImage("images/Left Room/Left_0.png"),
+      nodeX: 125,
+      nodeY: 95,
+      collected: false,
+      absorbing: false,
+      absorbStart: 0,
+      doorX: 15
+    },
+
+    right: {
+      image: loadImage("images/Right Room/Right_1.png"),
+      emptyImage: loadImage("images/Right Room/Right_0.png"),
+      nodeX: 125,
+      nodeY: 95,
+      collected: false,
+      absorbing: false,
+      absorbStart: 0,
+      doorX: 235
+    }
+  };
+
   let gameStarted = false;
+  let currentRoom = "center";
 
-  // PLAYER MOVEMENT
-  let playerX = (backgroundFrameWidth - playerFrameSize) / 2;
-  const playerY =
-    backgroundFrameHeight - playerFrameSize - playerBottomOffset;
-
-  const playerSpeed = 65;
+  let playerX = 96;
+  let playerY = 77;
   let facing = "right";
 
-  const drawScene = () => {
-    if (!gameStarted || !backgroundSheetLoaded) return;
+  let nodesCollected = 0;
 
-    context.imageSmoothingEnabled = false;
+  let backgroundFrame = 0;
+  let backgroundFinished = false;
+  let backgroundTime = 0;
 
-    const backgroundColumn =
-      backgroundFrame % backgroundColumns;
-    const backgroundRow =
-      Math.floor(backgroundFrame / backgroundColumns);
+  let idleFrame = 0;
+  let idleTime = 0;
+  let lastTime = 0;
 
-    context.clearRect(
-      0, 0, backgroundFrameWidth, backgroundFrameHeight
-    );
+  let message = "";
+  let messageUntil = 0;
+  let lastDoorInteraction = 0;
 
-    context.drawImage(
-      backgroundSheet,
-      backgroundColumn * backgroundFrameWidth,
-      backgroundRow * backgroundFrameHeight,
-      backgroundFrameWidth,
-      backgroundFrameHeight,
-      0, 0,
-      backgroundFrameWidth,
-      backgroundFrameHeight
-    );
+  // PLAYER SIZE
+  function playerSize() {
+    return SPRITE_SIZE * (1 + nodesCollected * GROWTH);
+  }
 
-    if (backgroundFinished && playerSheetLoaded) {
-      context.save();
+  // MESSAGE
+  function showMessage(text) {
+    message = text;
+    messageUntil = performance.now() + 2200;
+  }
 
-      // Flip sprite when facing left
-      if (facing === "left") {
-        context.translate(playerX + playerFrameSize, 0);
-        context.scale(-1, 1);
+  // ROOM TRANSITIONS
+  function changeRoom(room) {
+    const size = playerSize();
 
-        context.drawImage(
-          playerSheet,
-          idleFrame * playerFrameSize,
-          0,
-          playerFrameSize,
-          playerFrameSize,
-          0,
-          playerY,
-          playerFrameSize,
-          playerFrameSize
-        );
-      } else {
-        context.drawImage(
-          playerSheet,
-          idleFrame * playerFrameSize,
-          0,
-          playerFrameSize,
-          playerFrameSize,
-          playerX,
-          playerY,
-          playerFrameSize,
-          playerFrameSize
-        );
+    currentRoom = room;
+
+    if (room === "left") {
+      playerX = WIDTH - size - 4;
+    } else if (room === "right") {
+      playerX = 4;
+    } else {
+      playerX = 96;
+    }
+
+    keys.clear();
+  }
+
+  // DRAW IMAGE
+  function drawImage(image) {
+    if (!image.complete || !image.naturalWidth) return;
+
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(image, 0, 0, WIDTH, HEIGHT);
+  }
+
+  // DRAW BACKGROUND
+  function drawBackground() {
+    if (currentRoom === "center") {
+      if (!background.complete || !background.naturalWidth) {
+        return;
       }
 
-      context.restore();
-    }
-  };
+      const col = backgroundFrame % BG_COLUMNS;
+      const row = Math.floor(backgroundFrame / BG_COLUMNS);
 
-  const animate = timestamp => {
+      ctx.drawImage(
+        background,
+        col * WIDTH,
+        row * HEIGHT,
+        WIDTH,
+        HEIGHT,
+        0,
+        0,
+        WIDTH,
+        HEIGHT
+      );
+
+      return;
+    }
+
+    const room = rooms[currentRoom];
+
+    // After collecting the node, display the
+    // original room image without the square.
+    if (room.collected) {
+      drawImage(room.emptyImage);
+    } else {
+      drawImage(room.image);
+    }
+  }
+
+  // DRAW PLAYER
+  function drawPlayer() {
+    if (!playerSheet.complete || !playerSheet.naturalWidth) {
+      return;
+    }
+
+    const size = Math.round(playerSize());
+    const x = Math.round(playerX);
+    const y = Math.round(playerY + SPRITE_SIZE - size);
+
+    ctx.save();
+    ctx.imageSmoothingEnabled = false;
+
+    if (facing === "left") {
+      ctx.translate(x + size, 0);
+      ctx.scale(-1, 1);
+
+      ctx.drawImage(
+        playerSheet,
+        idleFrame * SPRITE_SIZE,
+        0,
+        SPRITE_SIZE,
+        SPRITE_SIZE,
+        0,
+        y,
+        size,
+        size
+      );
+    } else {
+      ctx.drawImage(
+        playerSheet,
+        idleFrame * SPRITE_SIZE,
+        0,
+        SPRITE_SIZE,
+        SPRITE_SIZE,
+        x,
+        y,
+        size,
+        size
+      );
+    }
+
+    ctx.restore();
+  }
+
+  // ABSORPTION ANIMATION
+  function drawAbsorption(now) {
+    if (currentRoom === "center") return;
+
+    const room = rooms[currentRoom];
+
+    if (!room.absorbing) return;
+
+    const progress = Math.min(
+      (now - room.absorbStart) / ABSORB_DURATION,
+      1
+    );
+
+    const playerCenterX = playerX + playerSize() / 2;
+    const playerCenterY = playerY + SPRITE_SIZE - 18;
+
+    const x = room.nodeX +
+      (playerCenterX - room.nodeX) * progress;
+
+    const y = room.nodeY +
+      (playerCenterY - room.nodeY) * progress;
+
+    const radius = Math.max(1, 6 * (1 - progress));
+
+    ctx.save();
+    ctx.globalAlpha = 1 - progress;
+    ctx.fillStyle = "#72d9ff";
+
+    ctx.beginPath();
+    ctx.arc(x, y, radius, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.restore();
+  }
+
+  // SHARP MESSAGE TEXT
+  function drawMessage(now) {
+    if (!message || now > messageUntil) return;
+
+    // Draw message at higher resolution first,
+    // then scale down using nearest-neighbor.
+    const scale = 3;
+
+    const textCanvas = document.createElement("canvas");
+    textCanvas.width = WIDTH * scale;
+    textCanvas.height = 30 * scale;
+
+    const textCtx = textCanvas.getContext("2d");
+
+    textCtx.imageSmoothingEnabled = false;
+
+    textCtx.fillStyle = "rgba(10, 15, 30, 0.95)";
+    textCtx.fillRect(
+      0,
+      0,
+      textCanvas.width,
+      textCanvas.height
+    );
+
+    textCtx.fillStyle = "#ffffff";
+    textCtx.font = "bold 24px monospace";
+    textCtx.textAlign = "center";
+    textCtx.textBaseline = "middle";
+
+    textCtx.fillText(
+      message,
+      textCanvas.width / 2,
+      textCanvas.height / 2,
+      textCanvas.width - 20
+    );
+
+    ctx.save();
+    ctx.imageSmoothingEnabled = false;
+
+    ctx.drawImage(
+      textCanvas,
+      0,
+      0,
+      textCanvas.width,
+      textCanvas.height,
+      0,
+      7,
+      WIDTH,
+      30
+    );
+
+    ctx.restore();
+  }
+
+  // START ABSORPTION
+  function startAbsorption(room, now) {
+    if (room.collected || room.absorbing) return;
+
+    room.absorbing = true;
+    room.absorbStart = now;
+  }
+
+  // FINISH ABSORPTION
+  function finishAbsorption(room) {
+    room.absorbing = false;
+    room.collected = true;
+
+    nodesCollected++;
+
+    showMessage("Intelligence absorbed!");
+  }
+
+  // UPDATE GAME
+  function update(delta, now) {
+    // Play background animation first.
+    if (currentRoom === "center" && !backgroundFinished) {
+      backgroundTime += delta * 1000;
+
+      while (backgroundTime >= BG_DURATION) {
+        backgroundTime -= BG_DURATION;
+        backgroundFrame++;
+
+        if (backgroundFrame >= BG_FRAMES) {
+          backgroundFrame = BG_HOLD;
+          backgroundFinished = true;
+          break;
+        }
+      }
+
+      return;
+    }
+
+    const left =
+      keys.has("ArrowLeft") || keys.has("KeyA");
+
+    const right =
+      keys.has("ArrowRight") || keys.has("KeyD");
+
+    if (left && !right) {
+      playerX -= SPEED * delta;
+      facing = "left";
+    }
+
+    if (right && !left) {
+      playerX += SPEED * delta;
+      facing = "right";
+    }
+
+    // Animate player.
+    idleTime += delta * 1000;
+
+    if (idleTime >= IDLE_DURATION) {
+      idleFrame = (idleFrame + 1) % IDLE_FRAMES;
+      idleTime = 0;
+    }
+
+    const size = playerSize();
+
+    // CENTER ROOM TRANSITIONS
+    if (currentRoom === "center") {
+      if (playerX <= 0) {
+        changeRoom("left");
+      } else if (playerX + size >= WIDTH) {
+        changeRoom("right");
+      }
+    }
+
+    // LEFT ROOM TRANSITION
+    else if (currentRoom === "left") {
+      if (playerX + size >= WIDTH) {
+        currentRoom = "center";
+        playerX = 4;
+        keys.clear();
+      } else {
+        playerX = Math.max(0, playerX);
+      }
+    }
+
+    // RIGHT ROOM TRANSITION
+    else if (currentRoom === "right") {
+      if (playerX <= 0) {
+        currentRoom = "center";
+        playerX = WIDTH - size - 4;
+        keys.clear();
+      } else {
+        playerX = Math.min(WIDTH - size, playerX);
+      }
+    }
+
+    if (currentRoom === "center") return;
+
+    const room = rooms[currentRoom];
+
+    const playerCenter = playerX + size / 2;
+
+    // NODE COLLECTION
+    if (!room.collected && !room.absorbing) {
+      if (Math.abs(playerCenter - room.nodeX) < 15) {
+        startAbsorption(room, now);
+      }
+    }
+
+    // FINISH ABSORPTION
+    if (room.absorbing) {
+      if (now - room.absorbStart >= ABSORB_DURATION) {
+        finishAbsorption(room);
+      }
+    }
+
+    // DOOR INTERACTION
+    if (
+      keys.has("Space") &&
+      now - lastDoorInteraction > 600
+    ) {
+      if (Math.abs(playerCenter - room.doorX) < 25) {
+        if (nodesCollected < 2) {
+          showMessage("You aren't strong enough");
+        } else {
+          showMessage("Cannot access at this time");
+        }
+
+        lastDoorInteraction = now;
+        keys.delete("Space");
+      }
+    }
+  }
+
+  // DRAW GAME
+  function draw(now) {
+    ctx.imageSmoothingEnabled = false;
+
+    ctx.clearRect(0, 0, WIDTH, HEIGHT);
+
+    drawBackground();
+
+    if (currentRoom !== "center" || backgroundFinished) {
+      drawPlayer();
+      drawAbsorption(now);
+    }
+
+    drawMessage(now);
+  }
+
+  // GAME LOOP
+  function animate(now) {
     if (!gameStarted) return;
 
-    if (lastBackgroundFrameTime === null) {
-      lastBackgroundFrameTime = timestamp;
-    } else if (
-      !backgroundFinished &&
-      timestamp - lastBackgroundFrameTime >=
-      backgroundFrameDuration
-    ) {
-      const elapsedFrames = Math.floor(
-        (timestamp - lastBackgroundFrameTime) /
-        backgroundFrameDuration
-      );
-
-      const nextFrame = backgroundFrame + elapsedFrames;
-
-      if (nextFrame >= backgroundFrameCount) {
-        backgroundFrame = backgroundHoldFrame;
-        backgroundFinished = true;
-      } else {
-        backgroundFrame = nextFrame;
-        lastBackgroundFrameTime +=
-          elapsedFrames * backgroundFrameDuration;
-      }
-    }
-
-    // MOVEMENT
-    if (lastMovementTime === null) {
-      lastMovementTime = timestamp;
-    }
-
-    const deltaTime = Math.min(
-      (timestamp - lastMovementTime) / 1000,
+    const delta = Math.min(
+      (now - lastTime) / 1000,
       0.05
     );
-    lastMovementTime = timestamp;
 
-    if (backgroundFinished) {
-      const movingLeft =
-        keysPressed.has("ArrowLeft") ||
-        keysPressed.has("KeyA");
+    lastTime = now;
 
-      const movingRight =
-        keysPressed.has("ArrowRight") ||
-        keysPressed.has("KeyD");
+    update(delta, now);
+    draw(now);
 
-      if (movingLeft && !movingRight) {
-        playerX -= playerSpeed * deltaTime;
-        facing = "left";
-      }
-
-      if (movingRight && !movingLeft) {
-        playerX += playerSpeed * deltaTime;
-        facing = "right";
-      }
-
-      // Keep player inside the screen
-      playerX = Math.max(
-        0,
-        Math.min(
-          backgroundFrameWidth - playerFrameSize,
-          playerX
-        )
-      );
-
-      // IDLE ANIMATION
-      if (!movingLeft && !movingRight) {
-        if (lastIdleFrameTime === null) {
-          lastIdleFrameTime = timestamp;
-        } else if (
-          timestamp - lastIdleFrameTime >= idleFrameDuration
-        ) {
-          const elapsedFrames = Math.floor(
-            (timestamp - lastIdleFrameTime) /
-            idleFrameDuration
-          );
-
-          idleFrame =
-            (idleFrame + elapsedFrames) % idleFrameCount;
-
-          lastIdleFrameTime +=
-            elapsedFrames * idleFrameDuration;
-        }
-      } else {
-        lastIdleFrameTime = timestamp;
-      }
-    }
-
-    drawScene();
     requestAnimationFrame(animate);
-  };
+  }
 
-  // START BUTTON EVENT
+  // START GAME
   canvas.addEventListener("hive:start", () => {
     if (gameStarted) return;
 
     gameStarted = true;
+    currentRoom = "center";
+
     backgroundFrame = 0;
-    idleFrame = 0;
-
-    playerX =
-      (backgroundFrameWidth - playerFrameSize) / 2;
-
     backgroundFinished = false;
-    lastBackgroundFrameTime = null;
-    lastIdleFrameTime = null;
-    lastMovementTime = null;
+    backgroundTime = 0;
 
+    playerX = 96;
+    playerY = 77;
+    facing = "right";
+
+    idleFrame = 0;
+    idleTime = 0;
+
+    nodesCollected = 0;
+
+    message = "";
+    messageUntil = 0;
+    lastDoorInteraction = 0;
+
+    for (const room of Object.values(rooms)) {
+      room.collected = false;
+      room.absorbing = false;
+      room.absorbStart = 0;
+    }
+
+    keys.clear();
+
+    lastTime = performance.now();
     requestAnimationFrame(animate);
   });
 
@@ -216,41 +492,23 @@
   window.addEventListener("keydown", event => {
     if (!gameStarted) return;
 
-    if (
-      ["ArrowLeft", "ArrowRight", "KeyA", "KeyD"]
-        .includes(event.code)
-    ) {
+    if ([
+      "ArrowLeft",
+      "ArrowRight",
+      "KeyA",
+      "KeyD",
+      "Space"
+    ].includes(event.code)) {
       event.preventDefault();
-      keysPressed.add(event.code);
+      keys.add(event.code);
     }
   });
 
   window.addEventListener("keyup", event => {
-    keysPressed.delete(event.code);
+    keys.delete(event.code);
   });
 
   window.addEventListener("blur", () => {
-    keysPressed.clear();
+    keys.clear();
   });
-
-  // LOAD SPRITES
-  playerSheet.addEventListener("load", () => {
-    playerSheetLoaded = true;
-  });
-
-  playerSheet.addEventListener("error", () => {
-    console.error("Could not load player sprite.");
-  });
-
-  backgroundSheet.addEventListener("load", () => {
-    backgroundSheetLoaded = true;
-    if (gameStarted) drawScene();
-  });
-
-  backgroundSheet.addEventListener("error", () => {
-    console.error("Could not load background.");
-  });
-
-  playerSheet.src = "images/Player Sprite.png";
-  backgroundSheet.src = "images/Background.png";
 })();
