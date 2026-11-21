@@ -9,8 +9,8 @@
         {
             "type": "editor-browser",
             "request": "launch",
-            "name": "Open circle.html",
-            "url": "file:///c%3A/Users/abrem/OneDrive/CM-Project/CM-Project/main.html"
+            "name": "Open main.html on GitHub",
+            "url": "https://github.com/Frey-Bremus/CM-Project/blob/main/main.html"
         }
     ]
 }
