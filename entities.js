@@ -1,3 +1,4 @@
+
 (() => {
   const canvas = document.getElementById("background");
   const ctx = canvas.getContext("2d");
@@ -34,14 +35,15 @@
 
   const keys = new Set();
 
+  // LOAD IMAGES
   function loadImage(path) {
     const image = new Image();
-    image.src = path;
 
     image.onerror = () => {
       console.error("Could not load:", path);
     };
 
+    image.src = path;
     return image;
   }
 
@@ -77,7 +79,6 @@
 
   let playerX = 96;
   let playerY = 77;
-  let facing = "right";
 
   let nodesCollected = 0;
 
@@ -90,22 +91,27 @@
   let spriteFrame = 0;
   let lastTime = 0;
 
+  // GAME MESSAGES
   let message = "";
   let messageUntil = 0;
   let lastDoorInteraction = 0;
+
+  // TUTORIAL
+  let tutorialMoved = false;
+  let tutorialRoomEntered = false;
 
   // PLAYER SIZE
   function playerSize() {
     return SPRITE_SIZE * (1 + nodesCollected * GROWTH);
   }
 
-  // MESSAGE
-  function showMessage(text) {
+  // SHOW GAME MESSAGE
+  function showMessage(text, duration = 2200) {
     message = text;
-    messageUntil = performance.now() + 2200;
+    messageUntil = performance.now() + duration;
   }
 
-  // ROOM TRANSITIONS
+  // CHANGE ROOMS
   function changeRoom(room) {
     const size = playerSize();
 
@@ -120,11 +126,17 @@
     }
 
     keys.clear();
+
+    if (room !== "center") {
+      tutorialRoomEntered = true;
+    }
   }
 
   // DRAW IMAGE
   function drawImage(image) {
-    if (!image.complete || !image.naturalWidth) return;
+    if (!image.complete || !image.naturalWidth) {
+      return;
+    }
 
     ctx.imageSmoothingEnabled = false;
     ctx.drawImage(image, 0, 0, WIDTH, HEIGHT);
@@ -165,107 +177,104 @@
   }
 
   // DRAW PLAYER
- function drawPlayer() {
-  if (!playerSheet.complete || !playerSheet.naturalWidth) {
-    return;
+  function drawPlayer() {
+    if (!playerSheet.complete || !playerSheet.naturalWidth) {
+      return;
+    }
+
+    const size = Math.round(playerSize());
+    const x = Math.round(playerX);
+    const y = Math.round(playerY + SPRITE_SIZE - size);
+
+    const column = spriteFrame % SPRITE_COLUMNS;
+    const row = Math.floor(spriteFrame / SPRITE_COLUMNS);
+
+    ctx.save();
+    ctx.imageSmoothingEnabled = false;
+
+    ctx.drawImage(
+      playerSheet,
+      column * SPRITE_SIZE,
+      row * SPRITE_SIZE,
+      SPRITE_SIZE,
+      SPRITE_SIZE,
+      x,
+      y,
+      size,
+      size
+    );
+
+    ctx.restore();
   }
-
-  const size = Math.round(playerSize());
-  const x = Math.round(playerX);
-  const y = Math.round(playerY + SPRITE_SIZE - size);
-
-  const column = spriteFrame % SPRITE_COLUMNS;
-  const row = Math.floor(spriteFrame / SPRITE_COLUMNS);
-
-  ctx.save();
-  ctx.imageSmoothingEnabled = false;
-
-  ctx.drawImage(
-    playerSheet,
-    column * SPRITE_SIZE,
-    row * SPRITE_SIZE,
-    SPRITE_SIZE,
-    SPRITE_SIZE,
-    x,
-    y,
-    size,
-    size
-  );
-
-  ctx.restore();
-}
 
   // CHANGE SPRITE ANIMATION
-function setSpriteMode(mode) {
-  if (spriteMode === mode) return;
+  function setSpriteMode(mode) {
+    if (spriteMode === mode) return;
 
-  spriteMode = mode;
-  idleTime = 0;
+    spriteMode = mode;
+    idleTime = 0;
 
-  if (mode === "left") {
-    spriteFrame = LEFT_START;
-  } else if (mode === "leftRelease") {
-    spriteFrame = LEFT_RELEASE_START;
-  } else if (mode === "right") {
-    spriteFrame = RIGHT_START;
-  } else if (mode === "rightRelease") {
-    spriteFrame = RIGHT_RELEASE_START;
-  } else {
-    spriteFrame = 0;
+    if (mode === "left") {
+      spriteFrame = LEFT_START;
+    } else if (mode === "leftRelease") {
+      spriteFrame = LEFT_RELEASE_START;
+    } else if (mode === "right") {
+      spriteFrame = RIGHT_START;
+    } else if (mode === "rightRelease") {
+      spriteFrame = RIGHT_RELEASE_START;
+    } else {
+      spriteFrame = 0;
+    }
   }
-}
 
   // UPDATE SPRITE ANIMATION
-// UPDATE SPRITE ANIMATION
-function updateSprite(delta) {
-  idleTime += delta * 1000;
+  function updateSprite(delta) {
+    idleTime += delta * 1000;
 
-  while (idleTime >= IDLE_DURATION) {
-    idleTime -= IDLE_DURATION;
+    while (idleTime >= IDLE_DURATION) {
+      idleTime -= IDLE_DURATION;
 
-    if (spriteMode === "left") {
-      if (spriteFrame < LEFT_END) {
-        // First press: 8 → 9 → 10 → 11
-        spriteFrame++;
+      if (spriteMode === "left") {
+        if (spriteFrame < LEFT_END) {
+          spriteFrame++;
+        } else {
+          // HOLD LEFT: 11 <-> 12
+          spriteFrame =
+            spriteFrame === LEFT_END
+              ? LEFT_LOOP_END
+              : LEFT_END;
+        }
+
+      } else if (spriteMode === "leftRelease") {
+        spriteFrame = Math.min(
+          spriteFrame + 1,
+          LEFT_RELEASE_END
+        );
+
+      } else if (spriteMode === "right") {
+        if (spriteFrame < RIGHT_END) {
+          spriteFrame++;
+        } else {
+          // HOLD RIGHT: 19 <-> 20
+          spriteFrame =
+            spriteFrame === RIGHT_END
+              ? RIGHT_LOOP_END
+              : RIGHT_END;
+        }
+
+      } else if (spriteMode === "rightRelease") {
+        spriteFrame = Math.min(
+          spriteFrame + 1,
+          RIGHT_RELEASE_END
+        );
+
       } else {
-        // Holding left: 11 ↔ 12 continuously
-        spriteFrame =
-          spriteFrame === LEFT_END
-            ? LEFT_LOOP_END
-            : LEFT_END;
+        spriteFrame = (spriteFrame + 1) % IDLE_FRAMES;
       }
-
-    } else if (spriteMode === "leftRelease") {
-      spriteFrame = Math.min(
-        spriteFrame + 1,
-        LEFT_RELEASE_END
-      );
-
-  } else if (spriteMode === "right") {
-    if (spriteFrame < RIGHT_END) {
-      // First press: 16 → 17 → 18 → 19
-      spriteFrame++;
-    } else {
-      // Holding right: 19 ↔ 20 continuously
-      spriteFrame =
-        spriteFrame === RIGHT_END
-          ? RIGHT_LOOP_END
-          : RIGHT_END;
-    }
-
-    } else if (spriteMode === "rightRelease") {
-      spriteFrame = Math.min(
-        spriteFrame + 1,
-        RIGHT_RELEASE_END
-      );
-
-    } else {
-      spriteFrame = (spriteFrame + 1) % IDLE_FRAMES;
     }
   }
-}
 
-  // ABSORPTION ANIMATION
+  // DRAW ABSORPTION ANIMATION
   function drawAbsorption(now) {
     if (currentRoom === "center") return;
 
@@ -300,15 +309,13 @@ function updateSprite(delta) {
     ctx.restore();
   }
 
-  // SHARP MESSAGE TEXT
-  function drawMessage(now) {
-    if (!message || now > messageUntil) return;
-
+  // DRAW TEXT BOX
+  function drawTextBox(text, y = 7, height = 30) {
     const scale = 3;
 
     const textCanvas = document.createElement("canvas");
     textCanvas.width = WIDTH * scale;
-    textCanvas.height = 30 * scale;
+    textCanvas.height = height * scale;
 
     const textCtx = textCanvas.getContext("2d");
 
@@ -328,7 +335,7 @@ function updateSprite(delta) {
     textCtx.textBaseline = "middle";
 
     textCtx.fillText(
-      message,
+      text,
       textCanvas.width / 2,
       textCanvas.height / 2,
       textCanvas.width - 20
@@ -344,15 +351,115 @@ function updateSprite(delta) {
       textCanvas.width,
       textCanvas.height,
       0,
-      7,
+      y,
       WIDTH,
-      30
+      height
     );
 
     ctx.restore();
   }
 
-  // START ABSORPTION
+  // DRAW NODE COUNTER
+  function drawNodeCounter() {
+    if (!backgroundFinished) return;
+
+    ctx.save();
+
+    ctx.fillStyle = "rgba(10, 15, 30, 0.9)";
+    ctx.fillRect(4, 4, 73, 15);
+
+    ctx.fillStyle = "#72d9ff";
+    ctx.font = "bold 8px monospace";
+    ctx.textAlign = "left";
+    ctx.textBaseline = "middle";
+
+    ctx.fillText(
+      "Nodes: " + nodesCollected + "/2",
+      9,
+      12
+    );
+
+    ctx.restore();
+  }
+
+  // CHECK WHETHER PLAYER IS NEAR EITHER DOOR
+  function isNearDoor() {
+    if (currentRoom === "center") {
+      return false;
+    }
+
+    const size = playerSize();
+    const playerLeft = playerX;
+    const playerRight = playerX + size;
+
+    const DOOR_DISTANCE = 35;
+
+    if (currentRoom === "left") {
+      return playerLeft <= rooms.left.doorX + DOOR_DISTANCE;
+    }
+
+    if (currentRoom === "right") {
+      return playerRight >= rooms.right.doorX - DOOR_DISTANCE;
+    }
+
+    return false;
+  }
+
+  // DRAW DOOR INTERACTION PROMPT
+  function drawDoorPrompt(now) {
+    if (!isNearDoor()) return;
+
+    // Hide while an interaction message is showing
+    if (message && now <= messageUntil) {
+      return;
+    }
+
+    // Always show near either door
+    drawTextBox(
+      "SPACE - Interact with door",
+      101,
+      23
+    );
+  }
+
+  // DRAW GAME MESSAGES AND TUTORIAL
+  function drawMessage(now) {
+
+    // Game messages take priority
+    if (message && now <= messageUntil) {
+      drawTextBox(message);
+      return;
+    }
+
+    // Opening animation
+    if (!backgroundFinished) {
+      drawTextBox("Press SPACE to skip");
+      return;
+    }
+
+    // Movement tutorial
+    if (!tutorialMoved) {
+      drawTextBox(
+        "Use A/D or arrow keys to move"
+      );
+      return;
+    }
+
+    // Glowing node tutorial only BEFORE first node
+    if (
+      nodesCollected === 0 &&
+      tutorialRoomEntered &&
+      currentRoom !== "center" &&
+      !rooms[currentRoom].collected &&
+      !rooms[currentRoom].absorbing
+    ) {
+      drawTextBox(
+        "Move toward the glowing node"
+      );
+    }
+  }
+
+  // START NODE ABSORPTION
   function startAbsorption(room, now) {
     if (room.collected || room.absorbing) return;
 
@@ -360,24 +467,31 @@ function updateSprite(delta) {
     room.absorbStart = now;
   }
 
-// FINISH ABSORPTION
-function finishAbsorption(room) {
-  room.absorbing = false;
-  room.collected = true;
+  // FINISH NODE ABSORPTION
+  function finishAbsorption(room) {
+    room.absorbing = false;
+    room.collected = true;
 
-  nodesCollected++;
+    nodesCollected++;
 
-  if (currentRoom === "left") {
-    showMessage("Shapes puzzle completed! Node Collected!");
-  } else if (currentRoom === "right") {
-    showMessage("Simon Says puzzle completed! Node collected!");
+    if (currentRoom === "left") {
+      showMessage("Shapes puzzle completed!");
+    } else if (currentRoom === "right") {
+      showMessage("Simon Says puzzle completed!");
+    }
+
+    // No additional node or door tutorial messages.
+    // The SPACE prompt still appears near both doors.
   }
-}
 
   // UPDATE GAME
   function update(delta, now) {
-    // Play background animation first.
-    if (currentRoom === "center" && !backgroundFinished) {
+
+    // OPENING ANIMATION
+    if (
+      currentRoom === "center" &&
+      !backgroundFinished
+    ) {
       backgroundTime += delta * 1000;
 
       while (backgroundTime >= BG_DURATION) {
@@ -400,27 +514,30 @@ function finishAbsorption(room) {
     const right =
       keys.has("ArrowRight") || keys.has("KeyD");
 
+    // FIRST MOVEMENT
+    if ((left || right) && !tutorialMoved) {
+      tutorialMoved = true;
+    }
+
     // PLAYER MOVEMENT
     if (left && !right) {
       playerX -= SPEED * delta;
-      facing = "left";
     }
 
     if (right && !left) {
       playerX += SPEED * delta;
-      facing = "right";
     }
 
     // PLAYER SPRITE ANIMATIONS
-if (left && !right) {
-  setSpriteMode("left");
-} else if (right && !left) {
-  setSpriteMode("right");
-} else if (spriteMode === "left") {
-  setSpriteMode("leftRelease");
-} else if (spriteMode === "right") {
-  setSpriteMode("rightRelease");
-}
+    if (left && !right) {
+      setSpriteMode("left");
+    } else if (right && !left) {
+      setSpriteMode("right");
+    } else if (spriteMode === "left") {
+      setSpriteMode("leftRelease");
+    } else if (spriteMode === "right") {
+      setSpriteMode("rightRelease");
+    }
 
     updateSprite(delta);
 
@@ -460,19 +577,22 @@ if (left && !right) {
     if (currentRoom === "center") return;
 
     const room = rooms[currentRoom];
-
     const playerCenter = playerX + size / 2;
 
     // NODE COLLECTION
     if (!room.collected && !room.absorbing) {
-      if (Math.abs(playerCenter - room.nodeX) < 15) {
+      if (
+        Math.abs(playerCenter - room.nodeX) < 15
+      ) {
         startAbsorption(room, now);
       }
     }
 
     // FINISH ABSORPTION
     if (room.absorbing) {
-      if (now - room.absorbStart >= ABSORB_DURATION) {
+      if (
+        now - room.absorbStart >= ABSORB_DURATION
+      ) {
         finishAbsorption(room);
       }
     }
@@ -482,12 +602,20 @@ if (left && !right) {
       keys.has("Space") &&
       now - lastDoorInteraction > 600
     ) {
-      if (Math.abs(playerCenter - room.doorX) < 25) {
+      if (isNearDoor()) {
         if (nodesCollected < 2) {
-          showMessage("Collect 2 nodes to break through!");
+          showMessage(
+            "Door locked! Nodes: " +
+            nodesCollected + "/2",
+            3000
+          );
         } else {
-         showMessage("Breakthrough successful! Dev note: Game unfinished.");
+          showMessage(
+            "UNDER CONSTRUCTION - Game unfinished!",
+            4000
+          );
         }
+
         lastDoorInteraction = now;
         keys.delete("Space");
       }
@@ -497,17 +625,21 @@ if (left && !right) {
   // DRAW GAME
   function draw(now) {
     ctx.imageSmoothingEnabled = false;
-
     ctx.clearRect(0, 0, WIDTH, HEIGHT);
 
     drawBackground();
 
-    if (currentRoom !== "center" || backgroundFinished) {
+    if (
+      currentRoom !== "center" ||
+      backgroundFinished
+    ) {
       drawPlayer();
       drawAbsorption(now);
     }
 
+    drawNodeCounter();
     drawMessage(now);
+    drawDoorPrompt(now);
   }
 
   // GAME LOOP
@@ -540,7 +672,6 @@ if (left && !right) {
 
     playerX = 96;
     playerY = 77;
-    facing = "right";
 
     idleTime = 0;
     spriteMode = "idle";
@@ -551,6 +682,10 @@ if (left && !right) {
     message = "";
     messageUntil = 0;
     lastDoorInteraction = 0;
+
+    // RESET TUTORIAL
+    tutorialMoved = false;
+    tutorialRoomEntered = false;
 
     for (const room of Object.values(rooms)) {
       room.collected = false;
@@ -578,20 +713,19 @@ if (left && !right) {
       event.preventDefault();
       keys.add(event.code);
     }
+
+    // SKIP OPENING ANIMATION
     if (
-    event.code === "Space" &&
-    currentRoom === "center" &&
-    !backgroundFinished
-  ) {
-    event.preventDefault();
+      event.code === "Space" &&
+      currentRoom === "center" &&
+      !backgroundFinished
+    ) {
+      backgroundFrame = BG_HOLD;
+      backgroundFinished = true;
+      backgroundTime = 0;
 
-    backgroundFrame = BG_HOLD;
-    backgroundFinished = true;
-    backgroundTime = 0;
-
-    keys.delete("Space");
-    return;
-  }
+      keys.delete("Space");
+    }
   });
 
   window.addEventListener("keyup", event => {
@@ -601,10 +735,5 @@ if (left && !right) {
   window.addEventListener("blur", () => {
     keys.clear();
   });
-  
-  
 
-  
 })();
-
-
