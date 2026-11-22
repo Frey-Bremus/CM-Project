@@ -1,3 +1,4 @@
+entities 
 
 (() => {
   const canvas = document.getElementById("background");
@@ -28,7 +29,7 @@
   const RIGHT_RELEASE_END = 22;
 
   const SPEED = 65;
-  const GROWTH = 0.15;
+  const GROWTH = 0.25;
   const ABSORB_DURATION = 400;
 
   const keys = new Set();
@@ -450,11 +451,10 @@ if (left && !right) {
     ) {
       if (Math.abs(playerCenter - room.doorX) < 25) {
         if (nodesCollected < 2) {
-          showMessage("You aren't strong enough");
+          showMessage("Collect 2 nodes to break through!");
         } else {
-          showMessage("Cannot access at this time");
+         showMessage("Breakthrough successful! Dev note: Game unfinished.");
         }
-
         lastDoorInteraction = now;
         keys.delete("Space");
       }
@@ -545,6 +545,20 @@ if (left && !right) {
       event.preventDefault();
       keys.add(event.code);
     }
+    if (
+    event.code === "Space" &&
+    currentRoom === "center" &&
+    !backgroundFinished
+  ) {
+    event.preventDefault();
+
+    backgroundFrame = BG_HOLD;
+    backgroundFinished = true;
+    backgroundTime = 0;
+
+    keys.delete("Space");
+    return;
+  }
   });
 
   window.addEventListener("keyup", event => {
@@ -554,4 +568,10 @@ if (left && !right) {
   window.addEventListener("blur", () => {
     keys.clear();
   });
+  
+  
+
+  
 })();
+
+
