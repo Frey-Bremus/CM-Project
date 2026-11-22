@@ -1,5 +1,3 @@
-screens
-
 (() => {
   const canvas = document.getElementById("background");
   const ctx = canvas.getContext("2d");
@@ -32,6 +30,9 @@ screens
     images[name] = files.map(path => {
       const img = new Image();
       img.src = path;
+      img.onerror = () => {
+  console.error("Failed to load image:", path);
+};
       return img;
     });
   }

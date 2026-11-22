@@ -1,5 +1,3 @@
-entities 
-
 (() => {
   const canvas = document.getElementById("background");
   const ctx = canvas.getContext("2d");
@@ -20,6 +18,7 @@ entities
 
   const LEFT_START = 8;
   const LEFT_END = 11;
+  const LEFT_LOOP_END = 12;
   const LEFT_RELEASE_START = 12;
   const LEFT_RELEASE_END = 15;
 
@@ -216,6 +215,7 @@ function setSpriteMode(mode) {
 }
 
   // UPDATE SPRITE ANIMATION
+// UPDATE SPRITE ANIMATION
 function updateSprite(delta) {
   idleTime += delta * 1000;
 
@@ -223,13 +223,35 @@ function updateSprite(delta) {
     idleTime -= IDLE_DURATION;
 
     if (spriteMode === "left") {
-      spriteFrame = Math.min(spriteFrame + 1, LEFT_END);
+      if (spriteFrame < LEFT_END) {
+        // First press: 8 → 9 → 10 → 11
+        spriteFrame++;
+      } else {
+        // Holding left: 11 ↔ 12 continuously
+        spriteFrame =
+          spriteFrame === LEFT_END
+            ? LEFT_LOOP_END
+            : LEFT_END;
+      }
+
     } else if (spriteMode === "leftRelease") {
-      spriteFrame = Math.min(spriteFrame + 1, LEFT_RELEASE_END);
+      spriteFrame = Math.min(
+        spriteFrame + 1,
+        LEFT_RELEASE_END
+      );
+
     } else if (spriteMode === "right") {
-      spriteFrame = Math.min(spriteFrame + 1, RIGHT_END);
+      spriteFrame = Math.min(
+        spriteFrame + 1,
+        RIGHT_END
+      );
+
     } else if (spriteMode === "rightRelease") {
-      spriteFrame = Math.min(spriteFrame + 1, RIGHT_RELEASE_END);
+      spriteFrame = Math.min(
+        spriteFrame + 1,
+        RIGHT_RELEASE_END
+      );
+
     } else {
       spriteFrame = (spriteFrame + 1) % IDLE_FRAMES;
     }
@@ -331,15 +353,19 @@ function updateSprite(delta) {
     room.absorbStart = now;
   }
 
-  // FINISH ABSORPTION
-  function finishAbsorption(room) {
-    room.absorbing = false;
-    room.collected = true;
+// FINISH ABSORPTION
+function finishAbsorption(room) {
+  room.absorbing = false;
+  room.collected = true;
 
-    nodesCollected++;
+  nodesCollected++;
 
-    showMessage("Intelligence absorbed!");
+  if (currentRoom === "left") {
+    showMessage("Shapes puzzle completed!");
+  } else if (currentRoom === "right") {
+    showMessage("Simon Says puzzle completed!");
   }
+}
 
   // UPDATE GAME
   function update(delta, now) {
