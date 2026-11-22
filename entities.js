@@ -23,7 +23,8 @@
   const LEFT_RELEASE_END = 15;
 
   const RIGHT_START = 16;
-  const RIGHT_END = 20;
+  const RIGHT_END = 19;
+  const RIGHT_LOOP_END = 20;
   const RIGHT_RELEASE_START = 21;
   const RIGHT_RELEASE_END = 22;
 
@@ -240,11 +241,17 @@ function updateSprite(delta) {
         LEFT_RELEASE_END
       );
 
-    } else if (spriteMode === "right") {
-      spriteFrame = Math.min(
-        spriteFrame + 1,
-        RIGHT_END
-      );
+  } else if (spriteMode === "right") {
+    if (spriteFrame < RIGHT_END) {
+      // First press: 16 → 17 → 18 → 19
+      spriteFrame++;
+    } else {
+      // Holding right: 19 ↔ 20 continuously
+      spriteFrame =
+        spriteFrame === RIGHT_END
+          ? RIGHT_LOOP_END
+          : RIGHT_END;
+    }
 
     } else if (spriteMode === "rightRelease") {
       spriteFrame = Math.min(
@@ -361,9 +368,9 @@ function finishAbsorption(room) {
   nodesCollected++;
 
   if (currentRoom === "left") {
-    showMessage("Shapes puzzle completed!");
+    showMessage("Shapes puzzle completed! Node Collected!");
   } else if (currentRoom === "right") {
-    showMessage("Simon Says puzzle completed!");
+    showMessage("Simon Says puzzle completed! Node collected!");
   }
 }
 
