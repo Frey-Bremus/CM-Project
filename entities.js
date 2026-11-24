@@ -91,7 +91,7 @@
 
   const SPEED = 65;
   const ABSORB_DURATION = 400;
-  const ROOM_FRAME_DURATION = 3000;
+  const ROOM_FRAME_DURATION = 300;
 
   const keys = new Set();
 
