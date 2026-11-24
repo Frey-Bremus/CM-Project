@@ -1,0 +1,93 @@
+
+/* PAGE */
+
+* {
+    box-sizing: border-box;
+}
+
+html,
+body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+}
+
+body {
+    background: #191b29;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    overflow: hidden;
+}
+
+/* GAME CONTAINER */
+
+#game-container {
+    position: relative;
+    width: min(100vw, 200vh);
+}
+
+/* GAME CANVAS */
+
+#background {
+    display: block;
+    width: 100% !important;
+    height: auto !important;
+    image-rendering: pixelated;
+}
+
+/* GAME INTERFACE */
+
+#game-ui {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    font-family: "Press Start 2P", monospace;
+    z-index: 10;
+}
+
+/* NODE COUNTER */
+
+#node-counter {
+    position: absolute;
+    top: 3%;
+    right: 2%;
+
+    padding: 12px;
+
+    background: #101625;
+    border: 2px solid #76b8dc;
+    box-shadow: 3px 3px 0 #080b12;
+
+    color: #bde8ff;
+    font-size: clamp(7px, 1vw, 14px);
+    line-height: 1.5;
+}
+
+/* DIALOGUE BOX */
+
+#dialogue-box {
+    position: absolute;
+    top: 15%;
+    left: 50%;
+    transform: translateX(-50%);
+
+    width: 85%;
+    padding: 18px;
+
+    background: rgba(16, 22, 37, 0.96);
+    border: 3px solid #76b8dc;
+    box-shadow: 4px 4px 0 #080b12;
+
+    color: white;
+    font-size: clamp(8px, 1.2vw, 16px);
+    line-height: 1.8;
+    text-align: center;
+}
+
+/* HIDE ELEMENTS */
+
+.hidden {
+    display: none !important;
+}
